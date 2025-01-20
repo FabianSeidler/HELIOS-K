@@ -1,4 +1,4 @@
-SM=35
+SM=86
 ARCH = -arch sm_$(SM)
 
 #Build data

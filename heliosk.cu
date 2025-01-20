@@ -10,6 +10,7 @@
 #include "host.h"
 #include "resample.h"
 #include "voigt.h"
+// #include "logger.h"
 
 /*
 // runs with biliniar interpolation
@@ -165,6 +166,11 @@ int main(int argc, char *argv[]) {
   cudaError_t error;
   int er;
 
+  // -------------- Init logger -------------- //
+  // Logger logger("log.txt");
+
+  // -------------- CUDA count ---------------- // 
+  /* One GPU, Ah-Ah-Ah! Two GPU's, Ah-Ah-Ah! Three ... */
   int devCount = 0;
   cudaGetDeviceCount(&devCount);
 
@@ -172,11 +178,13 @@ int main(int argc, char *argv[]) {
     printf("Error: No valid cuda device!\n");
     return 0;
   }
-  if (devCount == 1)
+  if (devCount == 1) {
     printf("There is %d CUDA Device\n", devCount);
-  else
+    // logger.log(INFO, "There is %d CUDA Device\n", devCount);
+  } else {
     printf("There are %d CUDA Devices\n", devCount);
-
+    // logger.log(INFO, "There are %d CUDA Devices\n", devCount);
+  }
   /*
   {
 
@@ -320,11 +328,18 @@ int main(int argc, char *argv[]) {
   return 0;
   }
   */
+
+
+  // ---------------- Define file names ----------- //
+  /* qFilename points to the partition function table Q and is defined here, but only read later with Init()*/
   char qFilename[15][160]; // for maximal 15 isotopologues
+  
+  /* Param filename is automatically "param.dat"; TODO: make it an argument! */
   char paramFilename[160];
   sprintf(paramFilename, "%s", "param.dat");
 
-  // Read prameters
+  // -------------- Init parameters --------------//
+  /* All empty, for now. See next section for reading. */
   Param param;
 
   sprintf(param.PFilename, "%s", "-");
@@ -376,15 +391,19 @@ int main(int argc, char *argv[]) {
   param.doTuning = def_doTuning;
   param.removePlinth = def_removePlinth;
 
+  // -------------- Read parameters --------------//
   er = read_parameters(param, paramFilename, argc, argv);
   if (er == 0) {
     return 0;
   }
+
+  // dev is only read via console arguments, and limits number of NVIDIA devices used.
   if (param.dev >= devCount || param.dev < 0) {
     printf("Error: Device Number is not allowed\n");
     return 0;
   }
 
+  // Will append to an existing file if "a", else "w" (overwrite)
   char filemode[16];
   if (param.replaceFiles == 0) {
     sprintf(filemode, "a");
