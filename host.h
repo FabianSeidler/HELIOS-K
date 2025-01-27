@@ -728,14 +728,18 @@ __host__ int readCiaFile(Param param, ciaSystem cia, double *x_h, double *K_h,
 
   Tcia1 = 0.0;
 
+  // set all K_h to zero
   for (int i = 0; i < Nx; ++i) {
     K_h[i] = 0.0;
   }
 
+  // Iterate through sets of (measured) opacity coefficients, defined by individual wavenumber
+  // and temperature ranges.
   for (int it = 0; it < cia.Nsets; ++it) {
 
     Tcia0 = Tcia1;
 
+    // read the section headers describing e.g. the wavenumber & temperature range
     fgets(skip, 21, ciaFile);
     fgets(c1, 11, ciaFile);
     fgets(c2, 11, ciaFile);
@@ -744,22 +748,27 @@ __host__ int readCiaFile(Param param, ciaSystem cia, double *x_h, double *K_h,
     fgets(c5, 11, ciaFile);
     fgets(skip, 37, ciaFile);
 
+    // convert strings to int & double
     Ncia = atoi(c3);
     Tcia1 = strtod(c4, NULL);
     double numax = strtod(c2, NULL);
-    // double max = strtod(c5, NULL);
-    // double numin = strtod(c1, NULL);
-    // printf("%g %g %d %g %g %g\n", numin, numax, Ncia, Tcia1, Tcia0, max);
+    double max = strtod(c5, NULL);
+    double numin = strtod(c1, NULL);
+    // printf("numin: %g numax: %g Ncia: %d Tcia0: %g Tcia1: %g max: %g\n", numin, numax, Ncia, Tcia0, Tcia1, max);
 
+    // read the first two sets of nu-cia_kappa in the set
     fscanf(ciaFile, "%lf", &nu0);
     fscanf(ciaFile, "%lf", &cia0);
     fscanf(ciaFile, "%lf", &nu1);
     fscanf(ciaFile, "%lf", &cia1);
 
+    // number of already read nu-cia_kappa pairs
     int nc = 2;
 
+    // loop over wavenumbers specified in x
     for (int i = 0; i < Nx; ++i) {
-
+      
+      // If the current wavenumber x_h[i] is larger than or equal to nu1, we need to read more data from the file to catch up with x_h[i].
       while (x_h[i] >= nu1) {
         nu0 = nu1;
         cia0 = cia1;
@@ -772,17 +781,18 @@ __host__ int readCiaFile(Param param, ciaSystem cia, double *x_h, double *K_h,
       }
 
       if (nu0 <= x_h[i] && x_h[i] < nu1) {
+        // printf("  T: %g, Tcia0: %g, Tcia1: %g\n", T, Tcia0, Tcia1);
+
+        // if T > Tcia1, 
         if (Tcia1 <= T) {
           K_h[i] = cia0 + (cia1 - cia0) * (x_h[i] - nu0) / (nu1 - nu0);
-          // if(Tcia1 == 400) printf("A %g %g %g %g %g %g %g\n", nu0, x_h[i],
-          // nu1, cia0, cia1, K_h[i], Tcia1);
+          // printf("    nu0: %g, x_h[i]: %g, nu1: %g, cia0: %g, cia1: %g, K_h[i]: %g\n", nu0, x_h[i], nu1, cia0, cia1, K_h[i]);
         }
         if (T < Tcia1 && Tcia0 > 0.0) {
           double K0 = K_h[i];
           double K1 = cia0 + (cia1 - cia0) * (x_h[i] - nu0) / (nu1 - nu0);
           K_h[i] = K0 + (K1 - K0) * (T - Tcia0) / (Tcia1 - Tcia0);
-          // printf("B %g %g %g %g %g %g %g %g %g\n", nu0, x_h[i], nu1, cia0,
-          // cia1, K_h[i], T, K0, K1);
+          // printf("    %g %g %g %g %g %g %g %g %g\n", nu0, x_h[i], nu1, cia0, cia1, K_h[i], T, K0, K1);
         }
       }
 
@@ -809,21 +819,28 @@ __host__ int readCiaFile(Param param, ciaSystem cia, double *x_h, double *K_h,
   double rho1 =
       P * 273.15 / T * def_amagat; // numerical density in molecules cm^-3
 
+  // Temporarily deactivate to test if CO2-CO2 CIA's can be extended to high temperatures
   for (int i = 0; i < Nx; ++i) {
     if (Tcia1 < T) {
       K_h[i] = param.kmin;
     } else {
       K_h[i] *= rho1; // K in cm^2 / molecule
-      K_h[i] *=
-          def_NA / cia.mass1; // K in cm^2 / g //should be masss of he in h2he
+      K_h[i] *= def_NA / cia.mass1; // K in cm^2 / g //should be masss of he in h2he
       K_h[i] += param.kmin;
     }
   }
 
+  // // Temporarily activated to test if CO2-CO2 CIA's can be extended to high temperatures
+  // for (int i = 0; i < Nx; ++i) {
+  //   K_h[i] *= rho1; // K in cm^2 / molecule
+  //   K_h[i] *= def_NA / cia.mass1; // K in cm^2 / g //should be masss of he in h2he
+  //   K_h[i] += param.kmin;
+  // }
+
   fclose(ciaFile);
-  for (int i = 0; i < Nx; ++i) {
-    // printf("%g %g %g\n", x_h[i], K_h[i], T);
-  }
+  // for (int i = 0; i < Nx; ++i) {
+  //   printf("%g %g %g\n", x_h[i], K_h[i], T);
+  // }
   return 1;
 }
 
